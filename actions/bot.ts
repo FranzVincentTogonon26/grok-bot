@@ -2,11 +2,12 @@
 
 import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
+import { nanoid } from "nanoid"
 import { z } from "zod"
 
 import { db } from "@/db"
-import { bots } from "@/db/schema"
 import { botFormSchema } from "@/db/validation"
+import { bots, chatMembers, chats } from "@/db/schema"
 
 /**
  * Form fields + the avatar seed chosen (or shuffled) in the dialog.
@@ -27,12 +28,19 @@ export async function createBot(input: CreateBotInput) {
     return { ok: false as const, error: "Invalid bot data." }
   }
 
-  const [bot] = await db
-    .insert(bots)
-    .values({ ...parsed.data, userId })
-    .returning({ id: bots.id })
+  // Pre-generate ids so the three inserts can be built up-front and run
+  // as ONE atomic Neon transaction via db.batch — the neon-http driver
+  // has no interactive `db.transaction()`, but batch() is atomic server-side.
+  const botId = nanoid()
+  const chatId = nanoid()
+
+  await db.batch([
+    db.insert(bots).values({ id: botId, ...parsed.data, userId }),
+    db.insert(chats).values({ id: chatId, kind: "direct", userId }),
+    db.insert(chatMembers).values({ chatId, botId }),
+  ])
 
   revalidatePath("/")
 
-  return { ok: true as const, id: bot.id }
+  return { ok: true as const, botId, chatId }
 }

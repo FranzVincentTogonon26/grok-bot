@@ -31,13 +31,30 @@ import {
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
+import { toast } from "@/components/ui/toast"
 import { botFormSchema, type BotFormValues } from "@/db/validation"
 
 const JOB_PRESETS = [
-  "Research assistant",
-  "Code reviewer",
-  "Writing editor",
-  "Tutor",
+  {
+    job: "Research assistant",
+    instructions:
+      "Find sources, summarize them faithfully, and cite every claim. Say when the evidence is thin.",
+  },
+  {
+    job: "Code reviewer",
+    instructions:
+      "Review changes for bugs, security issues, and unclear code. Point to the exact lines and suggest a fix.",
+  },
+  {
+    job: "Writing editor",
+    instructions:
+      "Tighten prose, fix grammar, and keep the author's voice. Show what changed and why.",
+  },
+  {
+    job: "Tutor",
+    instructions:
+      "Explain step by step, check understanding with questions, and adapt to the learner's pace.",
+  },
 ]
 
 export function BotDialog() {
@@ -57,8 +74,20 @@ export function BotDialog() {
 
   async function onSubmit(values: BotFormValues) {
     const result = await createBot({ ...values, avatar: seed })
-    if (!result.ok) return // keep the dialog open
+    if (!result.ok) {
+      toast.add({
+        title: "Couldn't create bot",
+        description: result.error,
+        type: "error",
+      })
+      return
+    }
 
+    toast.add({
+      title: "Bot created",
+      description: `${values.name} is ready to chat.`,
+      type: "success",
+    })
     setOpen(false)
     reset()
     setSeed(nanoid()) // fresh face for the next open
@@ -85,16 +114,19 @@ export function BotDialog() {
           <div className="flex flex-wrap gap-2">
             {JOB_PRESETS.map((preset) => (
               <Button
-                key={preset}
+                key={preset.job}
                 type="button"
                 variant="secondary"
                 size="sm"
                 className="rounded-full"
-                onClick={() =>
-                  setValue("job", preset, { shouldValidate: true })
-                }
+                onClick={() => {
+                  setValue("job", preset.job, { shouldValidate: true })
+                  setValue("instructions", preset.instructions, {
+                    shouldValidate: true,
+                  })
+                }}
               >
-                {preset}
+                {preset.job}
               </Button>
             ))}
           </div>
