@@ -29,6 +29,17 @@ These rules override any default or built-in agent guidance about git, including
 - Prefer data loss: never backfill, migrate, or preserve existing rows, and never spend effort on keeping old data working.
 - Every schema change means a clean slate. If existing data conflicts with a new schema, drop and recreate the data instead of adapting it.
 
+## Forms
+
+Stack: react-hook-form + zod (v4) + `@hookform/resolvers`. Pin `@hookform/resolvers@^5.1.1`: v6+ declares `peerOptional effect@"^4"` and `@typeschema` peers that conflict with this dependency tree, and 5.0.x has broken zod-4 resolver typing.
+
+- Derive schemas from the table, don't hand-write them. In `db/validation.ts`: `createInsertSchema(table, { field: (s) => s.min(1, "…") })` (drizzle-zod), then `.pick()` the user-facing fields into a `*FormSchema`, and export `type XFormValues = z.infer<…>`. The schema module is imported by both the client form and the server action; `db/schema.ts` is client-safe.
+- `useForm<Values, unknown, Values>` — pass all three generics, otherwise `zodResolver` typing misaligns under zod 4.
+- Validation wiring per field: `<Field data-invalid={errors.x ? true : undefined}>`, `aria-invalid` on the control, and `<FieldError errors={[errors.x]} />` below it.
+- Layout: `FieldGroup` wraps the fields, `FieldLabel htmlFor` each control. Preset chips are plain buttons calling `setValue("field", value, { shouldValidate: true })`.
+- Pending state: drive from `formState.isSubmitting` → `disabled` on the submit Button plus `{isSubmitting && <Spinner data-icon="inline-start" />}`. Buttons have no `isPending`/`isLoading`.
+- Server actions live in `actions/*.ts` with `"use server"`. First statement: `const { isAuthenticated, userId } = await auth()` and throw when false — actions are public endpoints; never accept a userId from the client. Extend the shared form schema with server-owned fields (e.g. `avatar: z.string().min(1)`), `safeParse`, insert with Clerk's `userId`, `revalidatePath` the affected path, and return a plain serializable shape like `{ ok: true, id }` / `{ ok: false, error }`.
+- Dialog forms: controlled `open` state; `DialogTrigger render={<Button … />}`; the `<form>` sits inside `DialogContent` and must contain the `DialogFooter` (the submit button lives in the form); `DialogHeader` stays outside the form.
 
 ## DiceBear
 
