@@ -16,7 +16,21 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     ".opencode/**",
+    // Vendored skill reference scripts — not application code.
+    ".agents/**",
   ]),
+  // Vendored shadcn registry components. The React Compiler rules flag
+  // patterns this third-party code relies on (media refs, effect state sync).
+  {
+    files: ["components/ai-elements/**"],
+    rules: {
+      "react-hooks/immutability": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/static-components": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
