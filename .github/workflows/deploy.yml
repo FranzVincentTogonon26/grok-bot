@@ -36,6 +36,9 @@ jobs:
       - name: Build Worker
         run: npx opennextjs-cloudflare build
         env:
+          # Required at build time by the db factory's module-scope guard
+          # (page-data collection imports queries/bots.ts -> db/index.ts).
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL }}
           NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_UP_URL }}
