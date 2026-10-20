@@ -1,4 +1,4 @@
-import type { z } from "zod"
+import { z } from "zod"
 import { createInsertSchema } from "drizzle-zod"
 
 import { bots } from "./schema"
@@ -24,3 +24,14 @@ export const botFormSchema = botInsertSchema.pick({
 })
 
 export type BotFormValues = z.infer<typeof botFormSchema>
+
+/**
+ * Update form: the shared user-facing fields plus server-owned inputs — the
+ * bot id being edited and the avatar seed the dialog currently shows.
+ */
+export const botUpdateSchema = botFormSchema.extend({
+  botId: z.string().min(1),
+  avatar: z.string().min(1),
+})
+
+export type BotUpdateValues = z.infer<typeof botUpdateSchema>

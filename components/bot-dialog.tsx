@@ -3,11 +3,22 @@
 import { useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { nanoid } from "nanoid"
-import { PlusIcon, ShuffleIcon } from "lucide-react"
+import { PlusIcon, ShuffleIcon, Trash2Icon } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 
-import { createBot } from "@/actions/bot"
+import { createBot, deleteBot, updateBot } from "@/actions/bot"
 import { ChatAvatar } from "@/components/chat-avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -64,15 +75,29 @@ type BotDialogProps = {
   onOpenChange?: (open: boolean) => void
   /** Content of the built-in trigger button; ignored when controlled. */
   trigger?: ReactNode
+  /**
+   * When set, the dialog edits this bot instead of creating one. Used
+   * controlled, from the chat header's avatar + name button.
+   */
+  bot?: {
+    id: string
+    name: string
+    job: string
+    instructions: string | null
+    avatar: string
+  }
 }
 
 export function BotDialog({
   open: openProp,
   onOpenChange: onOpenChangeProp,
   trigger,
+  bot,
 }: BotDialogProps) {
   const [openState, setOpenState] = useState(false)
-  const [seed, setSeed] = useState(() => nanoid())
+  const [seed, setSeed] = useState(() => bot?.avatar ?? nanoid())
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const router = useRouter()
 
   // Uncontrolled by default; controlled when `open` is passed.
   const open = openProp ?? openState
@@ -86,32 +111,72 @@ export function BotDialog({
     formState: { errors, isSubmitting },
   } = useForm<BotFormValues, unknown, BotFormValues>({
     resolver: zodResolver(botFormSchema),
-    defaultValues: { name: "", job: "", instructions: "" },
+    defaultValues: bot
+      ? { name: bot.name, job: bot.job, instructions: bot.instructions ?? "" }
+      : { name: "", job: "", instructions: "" },
   })
 
   async function onSubmit(values: BotFormValues) {
-    const result = await createBot({ ...values, avatar: seed })
+    const result = bot
+      ? await updateBot({ ...values, botId: bot.id, avatar: seed })
+      : await createBot({ ...values, avatar: seed })
+
     if (!result.ok) {
       toast.add({
-        title: "Couldn't create bot",
+        title: bot ? "Couldn't update bot" : "Couldn't create bot",
         description: result.error,
         type: "error",
       })
       return
     }
 
+    if (bot) {
+      toast.add({
+        title: "Bot updated",
+        description: `${values.name} has been updated.`,
+        type: "success",
+      })
+    } else {
+      toast.add({
+        title: "Bot created",
+        description: `${values.name} is ready to chat.`,
+        type: "success",
+      })
+      reset()
+      setSeed(nanoid()) // fresh face for the next open
+    }
+
+    setOpen(false)
+  }
+
+  async function handleDelete() {
+    if (!bot) return
+
+    const result = await deleteBot({ botId: bot.id })
+    if (!result.ok) {
+      toast.add({
+        title: "Couldn't delete bot",
+        description: result.error,
+        type: "error",
+      })
+      setConfirmOpen(false)
+      return
+    }
+
     toast.add({
-      title: "Bot created",
-      description: `${values.name} is ready to chat.`,
+      title: "Bot deleted",
+      description: `${bot.name} is gone.`,
       type: "success",
     })
+    setConfirmOpen(false)
     setOpen(false)
-    reset()
-    setSeed(nanoid()) // fresh face for the next open
+    // The chat no longer exists — leave the now-404 page.
+    router.push("/")
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
       {openProp === undefined && (
         <DialogTrigger
           render={<Button variant="secondary" className="rounded-full" />}
@@ -128,9 +193,11 @@ export function BotDialog({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>New bot</DialogTitle>
+            <DialogTitle>{bot ? "Edit bot" : "New bot"}</DialogTitle>
             <DialogDescription>
-              Give it a face, a name, and a job to do.
+              {bot
+                ? "Update its face, name, or job to do."
+                : "Give it a face, a name, and a job to do."}
             </DialogDescription>
           </DialogHeader>
 
@@ -214,16 +281,53 @@ export function BotDialog({
           </FieldGroup>
 
           <DialogFooter>
+            {bot && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="mr-auto"
+                disabled={isSubmitting}
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Trash2Icon data-icon="inline-start" />
+                Delete
+              </Button>
+            )}
             <DialogClose render={<Button variant="outline" />}>
               Cancel
             </DialogClose>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Spinner data-icon="inline-start" />}
-              Create bot
+              {bot ? "Save changes" : "Create bot"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      {bot && (
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {bot.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently deletes the bot and its chat. This can&apos;t
+                be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </>
   )
 }

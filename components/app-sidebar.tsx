@@ -5,7 +5,7 @@ import { UserButton } from "@clerk/nextjs"
 import { differenceInSeconds, formatDistanceToNowStrict } from "date-fns"
 import { PlusIcon, UsersRound, SearchIcon } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
 import { BotDialog } from "@/components/bot-dialog"
 import { ChatAvatar } from "@/components/chat-avatar"
@@ -65,7 +65,13 @@ function formatChatTime(date: Date) {
   return formatDistanceToNowStrict(date)
 }
 
-function ChatMenuItem({ chat }: { chat: SidebarChat }) {
+function ChatMenuItem({
+  chat,
+  active,
+}: {
+  chat: SidebarChat
+  active: boolean
+}) {
   return (
     <SidebarMenuItem>
       {/* Collapsed: the lg variant drops to a size-8 padded-0 icon square, so
@@ -74,6 +80,7 @@ function ChatMenuItem({ chat }: { chat: SidebarChat }) {
       <SidebarMenuButton
         size="lg"
         tooltip={chat.displayName}
+        isActive={active}
         render={<Link href={`/chats/${chat.id}`} />}
       >
         <ChatAvatar
@@ -152,6 +159,7 @@ export function ChatsCommandDialog({
 export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
   const [botDialogOpen, setBotDialogOpen] = useState(false)
   const [chatsSearchOpen, setChatsSearchOpen] = useState(false)
+  const pathname = usePathname()
 
   // ⌘K / Ctrl+K toggles the chats search palette. The visual indicator in
   // the search button renders with the built-in <Kbd> component.
@@ -219,9 +227,13 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
           {chats.length > 0 && (
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="gap-1">
                   {chats.map((chat) => (
-                    <ChatMenuItem key={chat.id} chat={chat} />
+                    <ChatMenuItem
+                      key={chat.id}
+                      chat={chat}
+                      active={pathname === `/chats/${chat.id}`}
+                    />
                   ))}
                 </SidebarMenu>
               </SidebarGroupContent>
