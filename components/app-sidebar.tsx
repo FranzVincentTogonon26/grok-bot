@@ -68,8 +68,18 @@ function formatChatTime(date: Date) {
 function ChatMenuItem({ chat }: { chat: SidebarChat }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton size="lg" render={<Link href={`/chats/${chat.id}`} />}>
-        <ChatAvatar seed={chat.botAvatar} className="size-10 shrink-0" />
+      {/* Collapsed: the lg variant drops to a size-8 padded-0 icon square, so
+          the avatar shrinks 10→8 to fill it; the text column (min-w-0 flex)
+          goes to zero width. Tooltip surfaces the chat name in that state. */}
+      <SidebarMenuButton
+        size="lg"
+        tooltip={chat.displayName}
+        render={<Link href={`/chats/${chat.id}`} />}
+      >
+        <ChatAvatar
+          seed={chat.botAvatar}
+          className="size-10 shrink-0 group-data-[collapsible=icon]:size-8!"
+        />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
           <div className="flex items-baseline gap-2">
             <span className="truncate font-semibold">{chat.displayName}</span>
@@ -164,7 +174,7 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
         open={chatsSearchOpen}
         onOpenChange={setChatsSearchOpen}
       />
-      <Sidebar>
+      <Sidebar collapsible="icon">
         <SidebarHeader className="items-end">
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -172,7 +182,7 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-10 rounded-xl"
+                  className="size-10 rounded-xl group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:rounded-md!"
                   aria-label="Create chat"
                 />
               }
@@ -191,15 +201,18 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
             </DropdownMenuContent>
           </DropdownMenu>
           {/* Fake input — Input's default classes copied so it reads as one;
-              the Button's own hover (hover:bg-primary/80) is kept intact. */}
+              the Button's own hover (hover:bg-primary/80) is kept intact.
+              Collapsed: an icon square that matches the other menu buttons. */}
           <Button
             type="button"
             onClick={() => setChatsSearchOpen(true)}
-            className="h-8 w-full min-w-0 justify-start rounded-lg border border-input bg-transparent px-2.5 py-1 text-base font-normal dark:bg-input/30 md:text-sm"
+            className="h-8 w-full min-w-0 justify-start rounded-lg border border-input bg-transparent px-2.5 py-1 text-base font-normal dark:bg-input/30 md:text-sm group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center! group-data-[collapsible=icon]:rounded-md! group-data-[collapsible=icon]:border-transparent! group-data-[collapsible=icon]:bg-transparent! group-data-[collapsible=icon]:px-0! group-data-[collapsible=icon]:hover:bg-sidebar-accent!"
           >
             <SearchIcon className="text-muted-foreground" />
-            <span className="text-muted-foreground">Search chats...</span>
-            <Kbd className="ml-auto">⌘K</Kbd>
+            <span className="text-muted-foreground group-data-[collapsible=icon]:hidden">
+              Search chats...
+            </span>
+            <Kbd className="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
           </Button>
         </SidebarHeader>
         <SidebarContent>

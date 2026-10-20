@@ -186,3 +186,20 @@
 [data-clerk-component="UserButton"] .cl-userButtonTrigger:hover .cl-userButtonOuterIdentifier {
   color: var(--sidebar-accent-foreground) !important;
 }
+
+/* ==== Sidebar UserButton — collapsed icon mode ==== */
+/* The sidebar root sets data-collapsible="icon" while collapsed; the
+   trigger then renders as an avatar-only 2rem square, centered exactly
+   like every other icon menu button in the rail. */
+[data-collapsible="icon"] [data-clerk-component="UserButton"] .cl-userButtonTrigger {
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+[data-collapsible="icon"] [data-clerk-component="UserButton"] .cl-userButtonOuterIdentifier {
+  display: none !important;
+}
+
+[data-collapsible="icon"] [data-clerk-component="UserButton"] .cl-userButtonBox {
+  gap: 0 !important;
+}
