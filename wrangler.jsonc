@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "grok-bot",
+  "workers_dev": true,
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": [
+    // Enable Node.js API
+    // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#nodejs-compatibility-flag
+    "nodejs_compat",
+    // Allow to fetch URLs in your app
+    // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#global-fetch-strictly-public
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      // The service should match the "name" of your worker
+      "service": "grok-bot"
+    }
+  ],
+  "r2_buckets": [
+    // Optional: uncomment to enable Next.js caching (ISR/SSG revalidation) with R2.
+    // Requires `incrementalCache: r2IncrementalCache` in open-next.config.ts plus
+    // a Workers KV namespace (NEXT_CACHE_REVALIDATION) as described in
+    // https://opennext.js.org/cloudflare/caching
+    // {
+    //   "binding": "NEXT_INC_CACHE_R2_BUCKET",
+    //   "bucket_name": "grok-bot-next-cache"
+    // },
+  ],
+  // Optional: enable to use next/image optimization via Cloudflare Images
+  // see https://opennext.js.org/cloudflare/howtos/image
+  // "images": {
+  //   "binding": "IMAGES"
+  // }
+}
