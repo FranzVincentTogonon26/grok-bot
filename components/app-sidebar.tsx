@@ -1,19 +1,32 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { UserButton } from "@clerk/nextjs"
 import { differenceInSeconds, formatDistanceToNowStrict } from "date-fns"
-import { PlusIcon, UsersRound } from "lucide-react"
+import { PlusIcon, UsersRound, SearchIcon } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { BotDialog } from "@/components/bot-dialog"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Kbd } from "@/components/ui/kbd"
 import {
   Sidebar,
   SidebarContent,
@@ -55,7 +68,7 @@ function formatChatTime(date: Date) {
 function ChatMenuItem({ chat }: { chat: SidebarChat }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton size="lg">
+      <SidebarMenuButton size="lg" render={<Link href={`/chats/${chat.id}`} />}>
         <ChatAvatar seed={chat.botAvatar} className="size-10 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
           <div className="flex items-baseline gap-2">
@@ -75,12 +88,82 @@ function ChatMenuItem({ chat }: { chat: SidebarChat }) {
   )
 }
 
+/**
+ * Chats searchable the same way they appear in the sidebar — group chats are
+ * ignored for now, the first (earliest-joined) member bot is the chat's face,
+ * which getSidebarChats already resolves server-side.
+ */
+export function ChatsCommandDialog({
+  chats,
+  open,
+  onOpenChange,
+}: {
+  chats: SidebarChat[]
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const router = useRouter()
+
+  return (
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Search chats"
+      description="Filter your chats by name or last message."
+    >
+      <Command>
+        <CommandInput placeholder="Search chats..." />
+        <CommandList>
+          <CommandEmpty>No chats found.</CommandEmpty>
+          <CommandGroup heading="Chats">
+            {chats.map((chat) => (
+              <CommandItem
+                key={chat.id}
+                value={`${chat.displayName} ${chat.lastMessagePreview ?? ""}`}
+                onSelect={() => {
+                  onOpenChange(false)
+                  router.push(`/chats/${chat.id}`)
+                }}
+              >
+                <ChatAvatar seed={chat.botAvatar} className="size-6 shrink-0" />
+                <span className="truncate">{chat.displayName}</span>
+                <CommandShortcut className="tracking-normal">
+                  {formatChatTime(chat.lastMessageAt)}
+                </CommandShortcut>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </CommandDialog>
+  )
+}
+
 export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
   const [botDialogOpen, setBotDialogOpen] = useState(false)
+  const [chatsSearchOpen, setChatsSearchOpen] = useState(false)
+
+  // ⌘K / Ctrl+K toggles the chats search palette. The visual indicator in
+  // the search button renders with the built-in <Kbd> component.
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        setChatsSearchOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [])
 
   return (
     <>
       <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
+      <ChatsCommandDialog
+        chats={chats}
+        open={chatsSearchOpen}
+        onOpenChange={setChatsSearchOpen}
+      />
       <Sidebar>
         <SidebarHeader className="items-end">
           <DropdownMenu>
@@ -107,6 +190,17 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* Fake input — Input's default classes copied so it reads as one;
+              the Button's own hover (hover:bg-primary/80) is kept intact. */}
+          <Button
+            type="button"
+            onClick={() => setChatsSearchOpen(true)}
+            className="h-8 w-full min-w-0 justify-start rounded-lg border border-input bg-transparent px-2.5 py-1 text-base font-normal dark:bg-input/30 md:text-sm"
+          >
+            <SearchIcon className="text-muted-foreground" />
+            <span className="text-muted-foreground">Search chats...</span>
+            <Kbd className="ml-auto">⌘K</Kbd>
+          </Button>
         </SidebarHeader>
         <SidebarContent>
           {chats.length > 0 && (
