@@ -1,10 +1,10 @@
 import { ClerkProvider } from "@clerk/nextjs"
+import { ui } from "@clerk/ui"
 import { shadcn } from "@clerk/ui/themes"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { SiteHeader } from "@/components/site-header"
 import { Toaster } from "@/components/ui/toast"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -33,10 +33,9 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ClerkProvider appearance={{ theme: shadcn }}>
+        <ClerkProvider appearance={{ theme: shadcn }} ui={ui}>
           <ThemeProvider>
             <TooltipProvider>
-              <SiteHeader />
               {children}
             </TooltipProvider>
             <Toaster />

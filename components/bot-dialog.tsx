@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { nanoid } from "nanoid"
 import { PlusIcon, ShuffleIcon } from "lucide-react"
@@ -57,9 +57,26 @@ const JOB_PRESETS = [
   },
 ]
 
-export function BotDialog() {
-  const [open, setOpen] = useState(false)
+type BotDialogProps = {
+  /** Controlled open state; omit to render the built-in trigger button. */
+  open?: boolean
+  /** Controlled setter, paired with `open`. */
+  onOpenChange?: (open: boolean) => void
+  /** Content of the built-in trigger button; ignored when controlled. */
+  trigger?: ReactNode
+}
+
+export function BotDialog({
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  trigger,
+}: BotDialogProps) {
+  const [openState, setOpenState] = useState(false)
   const [seed, setSeed] = useState(() => nanoid())
+
+  // Uncontrolled by default; controlled when `open` is passed.
+  const open = openProp ?? openState
+  const setOpen = onOpenChangeProp ?? setOpenState
 
   const {
     register,
@@ -95,12 +112,18 @@ export function BotDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={<Button variant="secondary" className="rounded-full" />}
-      >
-        <PlusIcon data-icon="inline-start" />
-        Create a new bot
-      </DialogTrigger>
+      {openProp === undefined && (
+        <DialogTrigger
+          render={<Button variant="secondary" className="rounded-full" />}
+        >
+          {trigger ?? (
+            <>
+              <PlusIcon data-icon="inline-start" />
+              Create a new bot
+            </>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
