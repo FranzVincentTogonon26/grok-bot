@@ -16,7 +16,12 @@
   // these are missing from the deployed Worker; values are managed with
   // `wrangler secret put` / `wrangler secret bulk`.
   "secrets": {
-    "required": ["CLERK_SECRET_KEY", "DATABASE_URL", "TRIGGER_SECRET_KEY"]
+    "required": [
+      "CLERK_SECRET_KEY",
+      "DATABASE_URL",
+      "TRIGGER_SECRET_KEY",
+      "DAYTONA_API_KEY"
+    ]
   },
   "assets": {
     "directory": ".open-next/assets",

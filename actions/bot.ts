@@ -9,6 +9,11 @@ import { z } from "zod"
 import { db } from "@/db"
 import { botFormSchema, botUpdateSchema } from "@/db/validation"
 import { bots, chatMembers, chats } from "@/db/schema"
+import {
+  createBotSandbox,
+  deleteBotSandbox,
+  isMissingDefaultRegionError,
+} from "@/lib/daytona"
 
 /**
  * Form fields + the avatar seed chosen (or shuffled) in the dialog.
@@ -35,11 +40,49 @@ export async function createBot(input: CreateBotInput) {
   const botId = nanoid()
   const chatId = nanoid()
 
-  await db.batch([
-    db.insert(bots).values({ id: botId, ...parsed.data, userId }),
-    db.insert(chats).values({ id: chatId, kind: "direct", userId }),
-    db.insert(chatMembers).values({ chatId, botId }),
-  ])
+  // One sandbox per bot. Provision it before the inserts so a bot row never
+  // exists without its sandbox; if the inserts fail, the sandbox is reclaimed.
+  let sandboxId: string
+  try {
+    sandboxId = await createBotSandbox(botId)
+  } catch (error) {
+    if (isMissingDefaultRegionError(error)) {
+      console.error(
+        `Failed to create a sandbox for bot ${botId}: the Daytona organization has no default region. Set one at https://app.daytona.io/dashboard.`,
+        error,
+      )
+      return {
+        ok: false as const,
+        error:
+          "Daytona has no default region yet. Set one at app.daytona.io/dashboard, then try again.",
+      }
+    }
+
+    console.error("Failed to create a sandbox for bot", botId, error)
+    return {
+      ok: false as const,
+      error: "Couldn't create the bot's sandbox. Try again.",
+    }
+  }
+
+  try {
+    await db.batch([
+      db.insert(bots).values({ id: botId, ...parsed.data, userId, sandboxId }),
+      db.insert(chats).values({ id: chatId, kind: "direct", userId }),
+      db.insert(chatMembers).values({ chatId, botId }),
+    ])
+  } catch (error) {
+    // Don't leave a sandbox behind when the bot never made it into the db.
+    await deleteBotSandbox(sandboxId).catch((cleanupError: unknown) => {
+      console.error(
+        "Failed to reclaim the sandbox for bot",
+        botId,
+        sandboxId,
+        cleanupError,
+      )
+    })
+    throw error
+  }
 
   revalidatePath("/")
 
@@ -119,7 +162,7 @@ export async function deleteBot(input: DeleteBotInput) {
   const [deleted] = await db
     .delete(bots)
     .where(and(eq(bots.id, botId), eq(bots.userId, userId)))
-    .returning({ id: bots.id })
+    .returning({ id: bots.id, sandboxId: bots.sandboxId })
 
   if (!deleted) {
     return { ok: false as const, error: "Bot not found." }
@@ -133,6 +176,21 @@ export async function deleteBot(input: DeleteBotInput) {
 
   if (directChatIds.length > 0) {
     await db.delete(chats).where(inArray(chats.id, directChatIds))
+  }
+
+  // The bot is gone, so release its sandbox. A failure here leaves an orphan
+  // in Daytona, but must never turn a completed delete into an error.
+  if (deleted.sandboxId) {
+    try {
+      await deleteBotSandbox(deleted.sandboxId)
+    } catch (error) {
+      console.error(
+        "Failed to delete the sandbox for bot",
+        botId,
+        deleted.sandboxId,
+        error,
+      )
+    }
   }
 
   revalidatePath("/")
