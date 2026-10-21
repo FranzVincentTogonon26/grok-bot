@@ -1,15 +1,18 @@
 "use server"
 
 import { auth } from "@trigger.dev/sdk"
-import { chat, defaultStorage } from "@trigger.dev/sdk/ai"
 
 import { getChatById } from "@/chats/queries"
 import type { chatAgent } from "@/trigger/chat"
 
-const startSession = chat.createStartSessionAction<typeof chatAgent>("chat")
-const loadTranscript = chat.createLoadTranscriptAction(defaultStorage, {
-  limit: 50,
-})
+/**
+ * The AI SDK chat helpers are heavy enough to matter on the Workers Free
+ * memory budget. Import them only when an action runs, not when the page that
+ * references these actions is server-rendered.
+ */
+function loadChatRuntime() {
+  return import("@trigger.dev/sdk/ai")
+}
 
 /**
  * `chatId` comes from the browser, so each action re-checks that the
@@ -26,7 +29,9 @@ async function assertChatAccess(chatId: string) {
  */
 export async function startChatSession({ chatId }: { chatId: string }) {
   await assertChatAccess(chatId)
-  return startSession({ chatId })
+
+  const { chat } = await loadChatRuntime()
+  return chat.createStartSessionAction<typeof chatAgent>("chat")({ chatId })
 }
 
 /** Pure mint — the transport calls this when a session token expires. */
@@ -51,5 +56,10 @@ export async function loadChatTranscript({
   limit?: number
 }) {
   await assertChatAccess(chatId)
-  return loadTranscript({ chatId, limit })
+
+  const { chat, defaultStorage } = await loadChatRuntime()
+  return chat.createLoadTranscriptAction(defaultStorage, { limit: 50 })({
+    chatId,
+    limit,
+  })
 }

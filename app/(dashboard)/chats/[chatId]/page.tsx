@@ -2,8 +2,8 @@ import { auth } from "@clerk/nextjs/server"
 import { notFound } from "next/navigation"
 
 import { getChatById } from "@/chats/queries"
-import { Chat } from "@/components/chat"
 import { ChatHeader } from "@/components/chat-header"
+import { ChatLazy } from "@/components/chat-lazy"
 
 export default async function ChatPage({
   params,
@@ -21,7 +21,7 @@ export default async function ChatPage({
   return (
     <div key={chat.id} className="flex min-h-0 flex-1 flex-col">
       <ChatHeader chat={chat} />
-      <Chat chatId={chat.id} placeholder={`Message ${chat.displayName}...`} />
+      <ChatLazy chatId={chat.id} placeholder={`Message ${chat.displayName}...`} />
     </div>
   )
 }
