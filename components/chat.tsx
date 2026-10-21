@@ -1,7 +1,18 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
+import type { UIMessage } from "ai"
+import {
+  useLoadTranscript,
+  useTriggerChatTransport,
+} from "@trigger.dev/sdk/chat/react"
+import type { TriggerChatTransport } from "@trigger.dev/sdk/chat"
 
+import {
+  loadChatTranscript,
+  mintChatAccessToken,
+  startChatSession,
+} from "@/actions/chat"
 import {
   Conversation,
   ConversationContent,
@@ -21,9 +32,58 @@ import {
   PromptInputTextarea,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input"
+import type { chatAgent } from "@/trigger/chat"
 
-export function Chat({ placeholder }: { placeholder?: string }) {
-  const { messages, sendMessage, status, stop, error } = useChat()
+export function Chat({
+  chatId,
+  placeholder,
+}: {
+  chatId: string
+  placeholder?: string
+}) {
+  const transport = useTriggerChatTransport<typeof chatAgent>({
+    task: "chat",
+    accessToken: ({ chatId }) => mintChatAccessToken(chatId),
+    startSession: ({ chatId }) => startChatSession({ chatId }),
+  })
+
+  // Mount the conversation only once the persisted transcript is in hand, so
+  // useChat starts from the same history the transport resumes from.
+  const { messages, isLoading } = useLoadTranscript(
+    chatId,
+    loadChatTranscript,
+    { transport }
+  )
+
+  if (isLoading) return null
+
+  return (
+    <ChatConversation
+      key={chatId}
+      chatId={chatId}
+      initialMessages={messages}
+      transport={transport}
+      placeholder={placeholder}
+    />
+  )
+}
+
+function ChatConversation({
+  chatId,
+  initialMessages,
+  transport,
+  placeholder,
+}: {
+  chatId: string
+  initialMessages: UIMessage[]
+  transport: TriggerChatTransport
+  placeholder?: string
+}) {
+  const { messages, sendMessage, status, stop, error } = useChat({
+    id: chatId,
+    messages: initialMessages,
+    transport,
+  })
 
   const handleSubmit = (message: PromptInputMessage) => {
     const text = message.text.trim()
@@ -46,9 +106,7 @@ export function Chat({ placeholder }: { placeholder?: string }) {
                 <MessageContent>
                   {message.parts.map((part, index) =>
                     part.type === "text" ? (
-                      <MessageResponse key={index}>
-                        {part.text}
-                      </MessageResponse>
+                      <MessageResponse key={index}>{part.text}</MessageResponse>
                     ) : null
                   )}
                 </MessageContent>

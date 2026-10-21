@@ -21,7 +21,7 @@ export default async function ChatPage({
   return (
     <div key={chat.id} className="flex min-h-0 flex-1 flex-col">
       <ChatHeader chat={chat} />
-      <Chat placeholder={`Message ${chat.displayName}...`} />
+      <Chat chatId={chat.id} placeholder={`Message ${chat.displayName}...`} />
     </div>
   )
 }

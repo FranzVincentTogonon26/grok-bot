@@ -12,6 +12,12 @@
     // see https://developers.cloudflare.com/workers/configuration/compatibility-flags/#global-fetch-strictly-public
     "global_fetch_strictly_public"
   ],
+  // Runtime secrets loaded by the Worker. `wrangler deploy` fails if any of
+  // these are missing from the deployed Worker; values are managed with
+  // `wrangler secret put` / `wrangler secret bulk`.
+  "secrets": {
+    "required": ["CLERK_SECRET_KEY", "DATABASE_URL", "TRIGGER_SECRET_KEY"]
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

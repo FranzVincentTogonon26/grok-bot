@@ -1,6 +1,6 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { defineConfig, globalIgnores } from "eslint/config"
+import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTs from "eslint-config-next/typescript"
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     ".opencode/**",
+    ".trigger/**",
     // Vendored skill reference scripts — not application code.
     ".agents/**",
   ]),
@@ -31,6 +32,6 @@ const eslintConfig = defineConfig([
       "react-hooks/static-components": "off",
     },
   },
-]);
+])
 
-export default eslintConfig;
+export default eslintConfig
