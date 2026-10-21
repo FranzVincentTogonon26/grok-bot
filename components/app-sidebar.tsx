@@ -8,7 +8,8 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
 import { BotDialog } from "@/components/bot-dialog"
-import { ChatAvatar } from "@/components/chat-avatar"
+import { ChatFace } from "@/components/chat-face"
+import { GroupChatDialog } from "@/components/group-chat-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -33,14 +34,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import type { SidebarChat } from "@/queries/bots"
+import type { BotOption, SidebarChat } from "@/queries/bots"
 
 /**
  * Trigger/box/avatar styling lives in app/globals.css (cl-userButton*
@@ -83,8 +83,9 @@ function ChatMenuItem({
         isActive={active}
         render={<Link href={`/chats/${chat.id}`} />}
       >
-        <ChatAvatar
-          seed={chat.botAvatar}
+        <ChatFace
+          kind={chat.kind}
+          seeds={chat.memberAvatars}
           className="size-10 shrink-0 group-data-[collapsible=icon]:size-8!"
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
@@ -106,9 +107,8 @@ function ChatMenuItem({
 }
 
 /**
- * Chats searchable the same way they appear in the sidebar — group chats are
- * ignored for now, the first (earliest-joined) member bot is the chat's face,
- * which getSidebarChats already resolves server-side.
+ * Chats searchable the same way they appear in the sidebar — direct chats use
+ * their bot's face, group chats use the member stack.
  */
 export function ChatsCommandDialog({
   chats,
@@ -142,7 +142,11 @@ export function ChatsCommandDialog({
                   router.push(`/chats/${chat.id}`)
                 }}
               >
-                <ChatAvatar seed={chat.botAvatar} className="size-6 shrink-0" />
+                <ChatFace
+                  kind={chat.kind}
+                  seeds={chat.memberAvatars}
+                  className="size-6 shrink-0"
+                />
                 <span className="truncate">{chat.displayName}</span>
                 <CommandShortcut className="tracking-normal">
                   {formatChatTime(chat.lastMessageAt)}
@@ -156,8 +160,15 @@ export function ChatsCommandDialog({
   )
 }
 
-export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
+export function AppSidebar({
+  chats,
+  bots,
+}: {
+  chats: SidebarChat[]
+  bots: BotOption[]
+}) {
   const [botDialogOpen, setBotDialogOpen] = useState(false)
+  const [groupChatDialogOpen, setGroupChatDialogOpen] = useState(false)
   const [chatsSearchOpen, setChatsSearchOpen] = useState(false)
   const pathname = usePathname()
 
@@ -177,6 +188,11 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
   return (
     <>
       <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
+      <GroupChatDialog
+        bots={bots}
+        open={groupChatDialogOpen}
+        onOpenChange={setGroupChatDialogOpen}
+      />
       <ChatsCommandDialog
         chats={chats}
         open={chatsSearchOpen}
@@ -202,7 +218,7 @@ export function AppSidebar({ chats }: { chats: SidebarChat[] }) {
                 <PlusIcon />
                 Create new bot
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setGroupChatDialogOpen(true)}>
                 <UsersRound />
                 Create group chat
               </DropdownMenuItem>

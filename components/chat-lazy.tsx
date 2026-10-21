@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic"
 
+import type { ChatParticipant } from "@/components/chat"
+
 /**
  * The chat UI pulls in the Trigger.dev chat runtime, which is client-only and
  * heavy on the Workers memory budget. Keep it out of the server render: the
@@ -14,10 +16,21 @@ const Chat = dynamic(
 
 export function ChatLazy({
   chatId,
+  kind,
+  members,
   placeholder,
 }: {
   chatId: string
+  kind: "direct" | "group"
+  members: ChatParticipant[]
   placeholder?: string
 }) {
-  return <Chat chatId={chatId} placeholder={placeholder} />
+  return (
+    <Chat
+      chatId={chatId}
+      kind={kind}
+      members={members}
+      placeholder={placeholder}
+    />
+  )
 }

@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import type { UIMessage } from "ai"
+import { CheckIcon, ChevronDownIcon } from "lucide-react"
 import {
   useLoadTranscript,
   useTriggerChatTransport,
@@ -32,6 +34,10 @@ import {
 } from "@/components/ai-elements/message"
 import {
   PromptInput,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuItem,
+  PromptInputActionMenuTrigger,
   PromptInputBody,
   PromptInputFooter,
   PromptInputSubmit,
@@ -47,6 +53,7 @@ import {
   ToolOutput,
   type ToolPart,
 } from "@/components/ai-elements/tool"
+import { ChatAvatar } from "@/components/chat-avatar"
 import type { chatAgent } from "@/trigger/chat"
 
 const TOOL_TITLES: Record<string, string> = {
@@ -67,11 +74,21 @@ const TOOL_TITLES: Record<string, string> = {
 
 const SCREEN_TOOLS = new Set(["viewScreen", "showScreen"])
 
+export type ChatParticipant = {
+  id: string
+  name: string
+  avatar: string
+}
+
 export function Chat({
   chatId,
+  kind,
+  members,
   placeholder,
 }: {
   chatId: string
+  kind: "direct" | "group"
+  members: ChatParticipant[]
   placeholder?: string
 }) {
   const transport = useTriggerChatTransport<typeof chatAgent>({
@@ -94,6 +111,8 @@ export function Chat({
     <ChatConversation
       key={chatId}
       chatId={chatId}
+      kind={kind}
+      members={members}
       initialMessages={messages}
       transport={transport}
       placeholder={placeholder}
@@ -103,15 +122,23 @@ export function Chat({
 
 function ChatConversation({
   chatId,
+  kind,
+  members,
   initialMessages,
   transport,
   placeholder,
 }: {
   chatId: string
+  kind: "direct" | "group"
+  members: ChatParticipant[]
   initialMessages: UIMessage[]
   transport: TriggerChatTransport
   placeholder?: string
 }) {
+  const [selectedBotId, setSelectedBotId] = useState(members[0]?.id ?? "")
+  const selectedBot =
+    members.find((member) => member.id === selectedBotId) ?? members[0]
+
   const { messages, sendMessage, status, stop, error } = useChat({
     id: chatId,
     messages: initialMessages,
@@ -121,6 +148,12 @@ function ChatConversation({
   const handleSubmit = (message: PromptInputMessage) => {
     const text = message.text.trim()
     if (!text) return
+
+    if (kind === "group" && selectedBot) {
+      sendMessage({ text }, { metadata: { botId: selectedBot.id } })
+      return
+    }
+
     sendMessage({ text })
   }
 
@@ -134,32 +167,68 @@ function ChatConversation({
               description="Send a message below to start the conversation."
             />
           ) : (
-            messages.map((message) => (
-              <Message key={message.id} from={message.role}>
-                <MessageContent>
-                  {message.parts.map((part, index) => {
-                    if (part.type === "text") {
-                      return (
-                        <MessageResponse key={`${message.id}-text-${index}`}>
-                          {part.text}
-                        </MessageResponse>
-                      )
-                    }
+            messages.map((message) => {
+              // In group chats, assistant messages have metadata.botId to identify which bot replied
+              const botId =
+                kind === "group" && message.role === "assistant"
+                  ? (message.metadata as { botId?: string } | undefined)?.botId
+                  : undefined
+              const bot = botId
+                ? members.find((member) => member.id === botId)
+                : undefined
 
-                    if (isToolPart(part)) {
-                      return (
-                        <ChatTool
-                          key={part.toolCallId ?? `${message.id}-tool-${index}`}
-                          part={part}
-                        />
-                      )
-                    }
+              const messageContent = (
+                <Message key={message.id} from={message.role}>
+                  <MessageContent>
+                    {message.parts.map((part, index) => {
+                      if (part.type === "text") {
+                        return (
+                          <MessageResponse
+                            key={`${message.id}-text-${index}`}
+                          >
+                            {part.text}
+                          </MessageResponse>
+                        )
+                      }
 
-                    return null
-                  })}
-                </MessageContent>
-              </Message>
-            ))
+                      if (isToolPart(part)) {
+                        return (
+                          <ChatTool
+                            key={
+                              part.toolCallId ??
+                              `${message.id}-tool-${index}`
+                            }
+                            part={part}
+                          />
+                        )
+                      }
+
+                      return null
+                    })}
+                  </MessageContent>
+                </Message>
+              )
+
+              // In group chats, show bot avatar next to assistant messages
+              if (kind === "group" && message.role === "assistant" && bot) {
+                return (
+                  <div
+                    key={message.id}
+                    className="group flex w-full max-w-[95%] flex-col gap-2 is-assistant"
+                  >
+                    <div className="flex gap-2">
+                      <ChatAvatar
+                        seed={bot.avatar}
+                        className="size-8 shrink-0 self-end"
+                      />
+                      <div className="flex-1 min-w-0">{messageContent}</div>
+                    </div>
+                  </div>
+                )
+              }
+
+              return messageContent
+            })
           )}
         </ConversationContent>
         <ConversationScrollButton />
@@ -175,7 +244,49 @@ function ChatConversation({
           <PromptInputBody>
             <PromptInputTextarea placeholder={placeholder} />
           </PromptInputBody>
-          <PromptInputFooter className="justify-end">
+          <PromptInputFooter
+            className={
+              kind === "group" && selectedBot ? undefined : "justify-end"
+            }
+          >
+            {kind === "group" && selectedBot && (
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger
+                  size="sm"
+                  className="h-8 max-w-48 min-w-0 gap-1.5 px-1.5"
+                  aria-label={`Choose which bot replies. Currently ${selectedBot.name}.`}
+                >
+                  <ChatAvatar
+                    seed={selectedBot.avatar}
+                    className="size-5 shrink-0"
+                  />
+                  <span className="min-w-0 truncate text-xs font-medium">
+                    {selectedBot.name}
+                  </span>
+                  <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                </PromptInputActionMenuTrigger>
+                <PromptInputActionMenuContent
+                  align="start"
+                  className="min-w-44"
+                >
+                  {members.map((member) => (
+                    <PromptInputActionMenuItem
+                      key={member.id}
+                      onClick={() => setSelectedBotId(member.id)}
+                    >
+                      <ChatAvatar
+                        seed={member.avatar}
+                        className="size-5 shrink-0"
+                      />
+                      <span className="min-w-0 truncate">{member.name}</span>
+                      {member.id === selectedBot.id && (
+                        <CheckIcon className="ml-auto size-4 shrink-0" />
+                      )}
+                    </PromptInputActionMenuItem>
+                  ))}
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
+            )}
             <PromptInputSubmit status={status} onStop={stop} />
           </PromptInputFooter>
         </PromptInput>

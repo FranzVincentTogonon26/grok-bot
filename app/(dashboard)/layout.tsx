@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { getSidebarChats } from "@/queries/bots"
+import { getBotOptions, getSidebarChats } from "@/queries/bots"
 
 /**
  * SidebarProvider writes every toggle to this cookie (see
@@ -16,8 +16,9 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [chats, cookieStore] = await Promise.all([
+  const [chats, bots, cookieStore] = await Promise.all([
     getSidebarChats(),
+    getBotOptions(),
     cookies(),
   ])
   // Absent cookie (first visit) -> expanded, matching the primitive's
@@ -29,7 +30,7 @@ export default async function DashboardLayout({
       defaultOpen={defaultOpen}
       className="h-svh overflow-hidden"
     >
-      <AppSidebar chats={chats} />
+      <AppSidebar chats={chats} bots={bots} />
       <SidebarInset className="min-h-0 overflow-hidden">
         {children}
       </SidebarInset>

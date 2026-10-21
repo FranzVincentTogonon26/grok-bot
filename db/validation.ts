@@ -34,4 +34,22 @@ export const botUpdateSchema = botFormSchema.extend({
   avatar: z.string().min(1),
 })
 
+/**
+ * Group chat name. `chats.name` is nullable because direct chats use their
+ * bot's name, so this form-level field is deliberately stricter than the
+ * generated insert schema.
+ */
+const groupChatNameSchema = z.string().trim().min(1, "Name is required")
+
+/**
+ * The group creation form: a name and the bots that belong in the group.
+ * `memberIds` is form-only; the chat and membership rows are built server-side.
+ */
+export const groupChatFormSchema = z.object({
+  name: groupChatNameSchema,
+  memberIds: z.array(z.string().min(1)).min(2, "Pick at least two bots"),
+})
+
+export type GroupChatFormValues = z.infer<typeof groupChatFormSchema>
+
 export type BotUpdateValues = z.infer<typeof botUpdateSchema>

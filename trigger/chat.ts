@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { chat } from "@trigger.dev/sdk/ai"
 import { stepCountIs, type ModelMessage } from "ai"
+import { z } from "zod"
 
 import {
   getChatAgentContext,
@@ -102,14 +103,25 @@ function stripOldScreenshots(messages: ModelMessage[]): ModelMessage[] {
 }
 
 /**
+ * Per-message client data. Group chats pass the bot selected in the composer;
+ * direct chats omit it and fall back to their only member.
+ */
+const chatClientDataSchema = z
+  .object({
+    botId: z.string().min(1).optional(),
+  })
+  .optional()
+
+/**
  * The chat agent behind every chat page. Trigger.dev persists the transcript
  * per chat (the Session's `externalId` is our chat id), so a reload or a new
  * run picks the conversation up where it left off.
  */
 export const chatAgent = chat.agent({
   id: "chat",
-  tools: async ({ chatId }) => {
-    const context = await getChatAgentContext(chatId)
+  clientDataSchema: chatClientDataSchema,
+  tools: async ({ chatId, clientData }) => {
+    const context = await getChatAgentContext(chatId, clientData?.botId)
     if (!context) throw new Error(`Chat ${chatId} not found`)
     if (!context.sandboxId) {
       throw new Error(`The bot for chat ${chatId} has no sandbox`)
@@ -124,11 +136,18 @@ export const chatAgent = chat.agent({
       return "Something went wrong. Please try again."
     },
   },
-  run: async ({ chatId, messages, tools, signal, streamText }) => {
+  run: async ({
+    chatId,
+    clientData,
+    messages,
+    tools,
+    signal,
+    streamText,
+  }) => {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) throw new Error("GEMINI_API_KEY is not set")
 
-    const context = await getChatAgentContext(chatId)
+    const context = await getChatAgentContext(chatId, clientData?.botId)
     if (!context) throw new Error(`Chat ${chatId} not found`)
 
     const google = createGoogleGenerativeAI({ apiKey })
