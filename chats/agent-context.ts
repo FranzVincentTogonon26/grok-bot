@@ -3,11 +3,22 @@ import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { bots, chatMembers, chats } from "@/db/schema"
 
+export type GroupMember = {
+  id: string
+  name: string
+  job: string
+  avatar: string
+}
+
 export type ChatAgentContext = {
   name: string
   job: string
   instructions: string | null
   sandboxId: string | null
+  /** True when this chat is a group chat. */
+  isGroup: boolean
+  /** Other bots in the group (excluding this bot). Present only for group chats. */
+  groupMembers: GroupMember[]
 }
 
 /**
@@ -28,12 +39,23 @@ export async function getChatAgentContext(
   chatId: string,
   botId?: string,
 ): Promise<ChatAgentContext | null> {
-  const [row] = await db
+  const [chatRow] = await db
+    .select({ kind: chats.kind })
+    .from(chats)
+    .where(eq(chats.id, chatId))
+    .limit(1)
+
+  if (!chatRow) return null
+  const isGroup = chatRow.kind === "group"
+
+  const [botRow] = await db
     .select({
       name: bots.name,
       job: bots.job,
       instructions: bots.instructions,
       sandboxId: bots.sandboxId,
+      id: bots.id,
+      avatar: bots.avatar,
     })
     .from(chats)
     .innerJoin(chatMembers, eq(chatMembers.chatId, chats.id))
@@ -42,5 +64,32 @@ export async function getChatAgentContext(
     .orderBy(asc(chatMembers.joinedAt), asc(chatMembers.botId))
     .limit(1)
 
-  return row ?? null
+  if (!botRow) return null
+
+  let groupMembers: GroupMember[] = []
+  if (isGroup) {
+    const otherMembers = await db
+      .select({
+        id: bots.id,
+        name: bots.name,
+        job: bots.job,
+        avatar: bots.avatar,
+      })
+      .from(chatMembers)
+      .innerJoin(bots, eq(bots.id, chatMembers.botId))
+      .where(and(eq(chatMembers.chatId, chatId), eq(bots.id, botId ? botId : botRow.id)))
+      .orderBy(asc(chatMembers.joinedAt), asc(chatMembers.botId))
+
+    // Exclude the current bot
+    groupMembers = otherMembers.filter((m) => m.id !== botRow.id)
+  }
+
+  return {
+    name: botRow.name,
+    job: botRow.job,
+    instructions: botRow.instructions,
+    sandboxId: botRow.sandboxId,
+    isGroup,
+    groupMembers,
+  }
 }

@@ -1,10 +1,21 @@
 import type { Sandbox } from "@daytona/sdk"
-import { tool } from "ai"
+import { tool, type Tool } from "ai"
 import { z } from "zod"
 
 import { getDaytonaClient } from "@/lib/daytona-client"
 
 const SANDBOX_START_TIMEOUT_SECONDS = 120
+
+/**
+ * Special result type for the handoff tool. The frontend detects this and
+ * triggers a re-send with the new bot selected.
+ */
+export type HandoffResult = {
+  handoff: true
+  targetBotId: string
+  targetBotName: string
+  reason: string
+}
 const MAX_COMMAND_OUTPUT = 20_000
 const MAX_READ_BYTES = 400_000
 const MAX_RANGED_READ_BYTES = 4_000_000
@@ -100,7 +111,10 @@ function screenshotToModelOutput({
  * Desktop operations are serialized because the AI SDK may execute parallel
  * tool calls. A click and a screenshot in the same step must not race.
  */
-export function createAgentTools(sandboxId: string) {
+export function createAgentTools(sandboxId: string, groupContext?: {
+  isGroup: boolean
+  groupMembers: { id: string; name: string; job: string }[]
+}) {
   let sandboxPromise: Promise<Sandbox> | undefined
   let desktopPromise: Promise<Sandbox> | undefined
   let desktopQueue: Promise<unknown> = Promise.resolve()
@@ -155,7 +169,8 @@ export function createAgentTools(sandboxId: string) {
     }
   }
 
-  return {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tools: Record<string, Tool<any, any>> = {
     bash: tool({
       description:
         "Run a shell command in the bot's Linux sandbox. Use this for programs, package installs, tests, and anything not covered by the file tools. Long-running servers should redirect output and run in the background.",
@@ -570,6 +585,58 @@ export function createAgentTools(sandboxId: string) {
       toModelOutput: screenshotToModelOutput,
     }),
   }
+
+  // Add handoff tool only for group chats
+  if (groupContext?.isGroup && groupContext.groupMembers.length > 0) {
+    tools.handoff = tool({
+      description:
+        "Transfer the conversation to another bot in this group chat. Use this when the user's request is better suited for another bot's expertise. The target bot will receive the full conversation history and continue from where you left off.",
+      inputSchema: z.object({
+        targetBotId: z
+          .string()
+          .min(1)
+          .describe(
+            "The ID of the bot to hand off to. Must be one of the available group members.",
+          ),
+        reason: z
+          .string()
+          .min(1)
+          .describe(
+            "Explain why this handoff is appropriate. This helps the target bot understand the context.",
+          ),
+      }),
+      execute: async ({ targetBotId, reason }) => {
+        const target = groupContext.groupMembers.find(
+          (m) => m.id === targetBotId,
+        )
+        if (!target) {
+          return errorResult(
+            `Bot ${targetBotId} is not a member of this group chat. Available: ${groupContext.groupMembers
+              .map((m) => `${m.name} (${m.id})`)
+              .join(", ")}`,
+          )
+        }
+
+        return {
+          handoff: true,
+          targetBotId: target.id,
+          targetBotName: target.name,
+          reason,
+        } as HandoffResult
+      },
+      toModelOutput: ({ output }) => {
+        if ("error" in output) {
+          return { type: "text" as const, value: `Error: ${output.error}` }
+        }
+        return {
+          type: "text" as const,
+          value: `Handed off to ${output.targetBotName}: ${output.reason}`,
+        }
+      },
+    })
+  }
+
+  return tools
 }
 
 export type AgentTools = ReturnType<typeof createAgentTools>

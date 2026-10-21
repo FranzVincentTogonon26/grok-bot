@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import type { UIMessage } from "ai"
 import { CheckIcon, ChevronDownIcon } from "lucide-react"
@@ -145,9 +145,14 @@ function ChatConversation({
     transport,
   })
 
+  // Track the last user message for handoff re-send
+  const lastUserMessageRef = useRef<string | null>(null)
+
   const handleSubmit = (message: PromptInputMessage) => {
     const text = message.text.trim()
     if (!text) return
+
+    lastUserMessageRef.current = text
 
     if (kind === "group" && selectedBot) {
       sendMessage({ text }, { metadata: { botId: selectedBot.id } })
@@ -156,6 +161,37 @@ function ChatConversation({
 
     sendMessage({ text })
   }
+
+  // Detect handoff tool results and trigger re-send with new bot
+  useEffect(() => {
+    if (kind !== "group") return
+
+    const lastMessage = messages[messages.length - 1]
+    if (!lastMessage || lastMessage.role !== "assistant") return
+
+    // Check for handoff tool result in the last assistant message
+    for (const part of lastMessage.parts) {
+      if (part.type === "tool-result" || part.type === "dynamic-tool") {
+        const output = part.output as { handoff?: boolean; targetBotId?: string; targetBotName?: string }
+        if (output?.handoff && output.targetBotId) {
+          // Handoff detected! Update selected bot and re-send last user message
+          const targetBot = members.find((m) => m.id === output.targetBotId)
+          if (targetBot && targetBot.id !== selectedBotId) {
+            setTimeout(() => {
+              setSelectedBotId(targetBot.id)
+              if (lastUserMessageRef.current) {
+                sendMessage(
+                  { text: lastUserMessageRef.current! },
+                  { metadata: { botId: targetBot.id } }
+                )
+              }
+            }, 0)
+          }
+          break
+        }
+      }
+    }
+  }, [messages, kind, members, selectedBotId, sendMessage, setSelectedBotId])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

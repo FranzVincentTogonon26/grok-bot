@@ -15,11 +15,29 @@ export function buildSystemPrompt({
   job,
   instructions,
   sandboxId,
+  isGroup,
+  groupMembers,
 }: ChatAgentContext) {
   const role = instructions?.trim()
   const sandbox = sandboxId
     ? `You have a dedicated Daytona sandbox reserved for you alone (sandbox ID: ${sandboxId}). It is an isolated Linux workspace, separate from the user's computer and from every other bot.`
     : "You have a dedicated Daytona sandbox reserved for you alone. It is an isolated Linux workspace, separate from the user's computer and from every other bot."
+
+  const groupContext = isGroup
+    ? [
+        "",
+        "GROUP CHAT CONTEXT:",
+        "You are in a group chat with other AI teammates. The user can select which bot responds each turn.",
+        `Your teammates: ${groupMembers.map((m) => `${m.name} (${m.job})`).join(", ")}`,
+        "",
+        "HANDOFF TOOL:",
+        "You have access to a 'handoff' tool that lets you transfer the conversation to another bot when their expertise is a better fit. Use it when:",
+        "- The user's request falls clearly within another bot's job/role",
+        "- Another bot has specialized knowledge or tools for the task",
+        "- The user explicitly asks for a different bot",
+        "When handing off, provide a clear reason so the target bot understands the context. The conversation history is preserved.",
+      ].join("\n")
+    : ""
 
   return [
     `You are ${name}, an AI teammate.`,
@@ -31,6 +49,7 @@ export function buildSystemPrompt({
     "",
     "Environment:",
     sandbox,
+    groupContext,
     "",
     "Your tools:",
     "You can work directly inside your sandbox. Use bash to run commands; use readFile, writeFile, and listFiles to work with files; and use the desktop tools to control the sandbox's graphical desktop.",
@@ -127,7 +146,14 @@ export const chatAgent = chat.agent({
       throw new Error(`The bot for chat ${chatId} has no sandbox`)
     }
 
-    return createAgentTools(context.sandboxId)
+    return createAgentTools(context.sandboxId, {
+      isGroup: context.isGroup,
+      groupMembers: context.groupMembers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        job: m.job,
+      })),
+    })
   },
   prepareMessages: ({ messages }) => stripOldScreenshots(messages),
   uiMessageStreamOptions: {
