@@ -18,9 +18,38 @@ function loadChatRuntime() {
  * `chatId` comes from the browser, so each action re-checks that the
  * signed-in Clerk user owns it — getChatById scopes the query by userId.
  */
-async function assertChatAccess(chatId: string) {
+async function getOwnedChat(chatId: string) {
   const existing = await getChatById(chatId)
   if (!existing) throw new Error("Chat not found")
+  return existing
+}
+
+async function assertChatAccess(chatId: string) {
+  await getOwnedChat(chatId)
+}
+
+/**
+ * Resolve the live desktop preview for this chat's bot. The Daytona SDK and
+ * preview URL signing stay server-side; the browser only receives a URL that
+ * is scoped to the one preview and expires.
+ */
+export async function getChatDesktopPreview({ chatId }: { chatId: string }) {
+  const chat = await getOwnedChat(chatId)
+
+  if (!chat.bot.sandboxId) {
+    return { ok: false as const, error: "This bot has no desktop yet." }
+  }
+
+  try {
+    const { getSandboxVncUrl } = await import("@/lib/daytona")
+    return { ok: true as const, url: await getSandboxVncUrl(chat.bot.sandboxId) }
+  } catch (error) {
+    console.error("Could not load sandbox desktop", error)
+    return {
+      ok: false as const,
+      error: "Couldn't start the desktop. Try again.",
+    }
+  }
 }
 
 /**

@@ -125,7 +125,7 @@ function ChatConversation({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Conversation>
         <ConversationContent>
           {messages.length === 0 ? (
@@ -165,7 +165,7 @@ function ChatConversation({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="p-4">
+      <div className="shrink-0 p-4">
         {error && (
           <p className="mb-2 text-sm text-destructive">
             {error.message || "Something went wrong."}

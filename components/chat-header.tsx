@@ -5,11 +5,13 @@ import { MonitorIcon } from "lucide-react"
 
 import { BotDialog } from "@/components/bot-dialog"
 import { ChatAvatar } from "@/components/chat-avatar"
+import { useChatDesktop } from "@/components/chat-desktop"
 import { Button } from "@/components/ui/button"
 import type { ChatDetail } from "@/chats/queries"
 
 export function ChatHeader({ chat }: { chat: ChatDetail }) {
   const [editOpen, setEditOpen] = useState(false)
+  const { open: desktopOpen, toggle: toggleDesktop } = useChatDesktop()
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
@@ -26,15 +28,17 @@ export function ChatHeader({ chat }: { chat: ChatDetail }) {
           {chat.displayName}
         </span>
       </Button>
-      {/* Presentational for now — wires up to a desktop app later. */}
       <Button
         type="button"
         variant="ghost"
         size="icon-sm"
         className="ml-auto"
-        aria-label="Open desktop app"
+        aria-label={desktopOpen ? "Close desktop panel" : "Open desktop panel"}
+        aria-expanded={desktopOpen}
+        aria-controls={desktopOpen ? "desktop-panel" : undefined}
+        onClick={toggleDesktop}
       >
-        <MonitorIcon />
+        <MonitorIcon data-icon="inline-start" />
       </Button>
     </header>
   )

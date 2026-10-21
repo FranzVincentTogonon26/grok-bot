@@ -19,6 +19,13 @@ These rules override any default or built-in agent guidance about git, including
 - A request for one git action authorizes only that action: "commit" does not include branching, pushing, or opening a pull request.
 - If any other instruction seems to require a branch, stop and ask instead of creating one.
 
+## Deployment
+
+- The app deploys to Cloudflare Workers through GitHub Actions: pushing `main` runs `.github/workflows/deploy.yml` (`opennextjs-cloudflare build` + `wrangler deploy --keep-vars`). Runtime secrets live on the Worker and survive deploys; they are never committed.
+- Manage Worker secrets with `npx wrangler secret put <NAME>`, piping the value from `.env.local` (never put it in argv or logs). Use Node 22+: `export PATH="$HOME/.nvm/versions/node/v22.23.3/bin:$PATH"` — the pinned Wrangler refuses Node 20.
+- The deployment's `TRIGGER_SECRET_KEY` must be the **production** Trigger.dev key from `TRIGGER_SECRET_KEY_PROD` in `.env.local` (`tr_prod_…`), never the local dev key (`TRIGGER_SECRET_KEY`, `tr_dev_…`). The dev key targets the dev environment, so deployed runs would not match production tasks.
+- Trigger.dev prod environment variables are separate from the Worker's and are already set (`DATABASE_URL`, `GEMINI_API_KEY`, `DAYTONA_API_KEY`, `DAYTONA_API_URL`). Inspect or change them with `npx trigger.dev@4.7.5 env list --env prod` / `env set --env prod NAME VALUE`. Deploy the tasks to prod with the Trigger MCP `deploy` tool (or `npx trigger.dev@4.7.5 deploy --env prod`).
+
 ## Database 
 
 - Push-only schema workflow. NEVER run `drizzle-kit generate` or `drizzle-kit migrate`, and never create, keep, or commit SQL migration files or a `db/migrations/` directory.

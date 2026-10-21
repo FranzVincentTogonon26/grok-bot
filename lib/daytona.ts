@@ -14,6 +14,10 @@ import { getDaytonaClient } from "@/lib/daytona-client"
  * `actions/chat.ts`).
  */
 
+const VNC_PORT = 6080
+const SANDBOX_START_TIMEOUT_SECONDS = 120
+const VNC_URL_TTL_SECONDS = 60 * 60 * 24
+
 /** Labels stamped on every sandbox so a leaked one is attributable. */
 function sandboxLabels(botId: string) {
   return { app: "grok-bot", botId }
@@ -47,6 +51,45 @@ export async function createBotSandbox(botId: string): Promise<string> {
   })
 
   return sandbox.id
+}
+
+/**
+ * A browser-openable noVNC URL for a bot's desktop.
+ *
+ * The signed URL embeds its own preview token, so it can be used directly as
+ * an iframe source (an iframe cannot send the `x-daytona-preview-token`
+ * header that the standard preview link requires).
+ *
+ * Starting an idle sandbox and its desktop processes is part of loading the
+ * preview: a stopped sandbox has no container IP to proxy to. Starting is
+ * idempotent, and the caller only invokes this for a chat it owns.
+ */
+export async function getSandboxVncUrl(sandboxId: string): Promise<string> {
+  const daytona = await getDaytonaClient()
+  const sandbox = await daytona.get(sandboxId)
+
+  if (sandbox.state !== "started") {
+    await sandbox.start(SANDBOX_START_TIMEOUT_SECONDS)
+  }
+
+  const desktop = await sandbox.computerUse.getStatus()
+  if (desktop.status !== "active") {
+    await sandbox.computerUse.start()
+  }
+
+  const { url } = await sandbox.getSignedPreviewUrl(
+    VNC_PORT,
+    VNC_URL_TTL_SECONDS
+  )
+
+  // `vnc_lite.html` is noVNC's minimal viewer: it connects immediately and
+  // has no settings panel competing with the desktop. `scale` keeps the
+  // remote screen fitted to the iframe as the panel and dialog resize.
+  const preview = new URL(url)
+  preview.pathname = `${preview.pathname.replace(/\/$/, "")}/vnc_lite.html`
+  preview.searchParams.set("scale", "true")
+
+  return preview.toString()
 }
 
 /**

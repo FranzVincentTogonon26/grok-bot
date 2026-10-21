@@ -20,6 +20,7 @@ export type ChatDetail = {
     job: string
     instructions: string | null
     avatar: string
+    sandboxId: string | null
   }
 }
 
@@ -54,6 +55,7 @@ export async function getChatById(chatId: string): Promise<ChatDetail | null> {
       job: row.bot.job,
       instructions: row.bot.instructions,
       avatar: row.bot.avatar,
+      sandboxId: row.bot.sandboxId,
     },
   }
 }
